@@ -263,7 +263,7 @@ sleep 2
 
 # Start MariaDB service in WSL
 echo -e "${YELLOW}Ensuring MariaDB service is started...${NC}"
-sudo service mysql start
+sudo /etc/init.d/mysql start
 sleep 2
 
 # Use a hidden marker file to determine if this section of the script has run before.
@@ -293,7 +293,7 @@ collation-server = utf8mb4_unicode_ci
 default-character-set = utf8mb4
 EOF'
 
-    sudo service mysql restart
+    sudo /etc/init.d/mysql restart
 
     # Create the hidden marker file to indicate this section of the script has run.
     touch "$MARKER_FILE"
