@@ -263,8 +263,10 @@ sleep 2
 
 # Start MariaDB service in WSL
 echo -e "${YELLOW}Ensuring MariaDB service is started...${NC}"
-sudo /etc/init.d/mysql start
-sleep 2
+sudo mkdir -p /var/run/mysqld
+sudo chown mysql:mysql /var/run/mysqld
+sudo mysqld_safe --datadir='/var/lib/mysql' &
+sleep 10
 
 # Use a hidden marker file to determine if this section of the script has run before.
 MARKER_FILE=~/.mysql_configured.marker
@@ -544,3 +546,4 @@ case "$continue_prod" in
     echo -e "-----------------------------------------------------------------------------------------------${NC}"
     ;;
 esac
+
