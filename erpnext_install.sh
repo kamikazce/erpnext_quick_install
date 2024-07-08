@@ -295,7 +295,7 @@ collation-server = utf8mb4_unicode_ci
 default-character-set = utf8mb4
 EOF'
 
-    sudo /etc/init.d/mysql restart
+    sudo mysqladmin shutdown
 
     # Create the hidden marker file to indicate this section of the script has run.
     touch "$MARKER_FILE"
@@ -303,6 +303,11 @@ EOF'
     echo -e "\n"
     sleep 1
 fi
+
+# Restart MariaDB after applying settings
+echo -e "${YELLOW}Restarting MariaDB...${NC}"
+sudo mysqld_safe --datadir='/var/lib/mysql' &
+sleep 10
 
 # Install NVM, Node, npm and yarn
 echo -e ${YELLOW}"Now to install NVM, Node, npm and yarn${NC}"
@@ -546,4 +551,3 @@ case "$continue_prod" in
     echo -e "-----------------------------------------------------------------------------------------------${NC}"
     ;;
 esac
-
