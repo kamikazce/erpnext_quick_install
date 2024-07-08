@@ -261,6 +261,11 @@ sudo apt install mariadb-server mariadb-client -y
 echo -e "${GREEN}MariaDB and other packages have been installed successfully.${NC}"
 sleep 2
 
+# Start MariaDB service in WSL
+echo -e "${YELLOW}Ensuring MariaDB service is started...${NC}"
+sudo service mysql start
+sleep 2
+
 # Use a hidden marker file to determine if this section of the script has run before.
 MARKER_FILE=~/.mysql_configured.marker
 
@@ -435,7 +440,7 @@ case "$continue_prod" in
         bench setup redis
         sudo supervisorctl reload
     fi
-    echo -e "${YELLOW}Restarting bench to apply all changes and optimizing environment pernissions.${NC}"
+    echo -e "${YELLOW}Restarting bench to apply all changes and optimizing environment permissions.${NC}"
     sleep 1
 
 
