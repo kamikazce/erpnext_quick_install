@@ -263,7 +263,7 @@ sleep 2
 
 # Update /etc/mysql/mariadb.conf.d/50-server.cnf
 echo -e "${YELLOW}Updating MariaDB configuration...${NC}"
-sudo bash -c 'cat << EOF > /etc/mysql/mariadb.conf.d/50-server.cnf
+sudo bash -c 'cat > /etc/mysql/mariadb.conf.d/50-server.cnf' << EOF
 #
 # MySQL/MariaDB default is Latin1, but in Debian we rather default to the full
 # utf8 4-byte character set. See also client.cnf
@@ -292,7 +292,7 @@ collation-server      = utf8mb4_unicode_ci
 # If you use the same .cnf file for MariaDB of different versions,
 # use this group for options that older servers don't understand
 [mariadb-10.6]
-EOF'
+EOF
 
 echo -e "${GREEN}MariaDB configuration updated.${NC}"
 sleep 2
