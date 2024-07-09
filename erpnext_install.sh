@@ -261,12 +261,46 @@ sudo apt install mariadb-server mariadb-client -y
 echo -e "${GREEN}MariaDB and other packages have been installed successfully.${NC}"
 sleep 2
 
-# Start MariaDB service in WSL
-echo -e "${YELLOW}Ensuring MariaDB service is started...${NC}"
-sudo mkdir -p /var/run/mysqld
-sudo chown mysql:mysql /var/run/mysqld
-sudo mysqld_safe --datadir='/var/lib/mysql' &
-sleep 10
+# Update /etc/mysql/mariadb.conf.d/50-server.cnf
+echo -e "${YELLOW}Updating MariaDB configuration...${NC}"
+sudo bash -c 'cat << EOF > /etc/mysql/mariadb.conf.d/50-server.cnf
+#
+# MySQL/MariaDB default is Latin1, but in Debian we rather default to the full
+# utf8 4-byte character set. See also client.cnf
+character-set-server  = utf8mb4
+collation-server      = utf8mb4_unicode_ci
+
+#
+# * InnoDB
+#
+
+# InnoDB is enabled by default with a 10MB datafile in /var/lib/mysql/.
+# Read the manual for more InnoDB related options. There are many!
+# Most important is to give InnoDB 80 % of the system RAM for buffer use:
+# https://mariadb.com/kb/en/innodb-system-variables/#innodb_buffer_pool_size
+#innodb_buffer_pool_size = 8G
+
+# this is only for embedded server
+[embedded]
+
+# This group is only read by MariaDB servers, not by MySQL.
+# If you use the same .cnf file for MySQL and MariaDB,
+# you can put MariaDB-only options here
+[mariadb]
+
+# This group is only read by MariaDB-10.6 servers.
+# If you use the same .cnf file for MariaDB of different versions,
+# use this group for options that older servers don't understand
+[mariadb-10.6]
+EOF'
+
+echo -e "${GREEN}MariaDB configuration updated.${NC}"
+sleep 2
+
+# Restart MariaDB service
+echo -e "${YELLOW}Restarting MariaDB service...${NC}"
+sudo service mariadb restart
+sleep 5
 
 # Use a hidden marker file to determine if this section of the script has run before.
 MARKER_FILE=~/.mysql_configured.marker
@@ -276,26 +310,7 @@ if [ ! -f "$MARKER_FILE" ]; then
     echo -e ${YELLOW}"Now we'll go ahead to apply MariaDB security settings...${NC}"
     sleep 2
 
-    sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '$sqlpasswrd';"
-    sudo mysql -u root -p"$sqlpasswrd" -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '$sqlpasswrd';"
-    sudo mysql -u root -p"$sqlpasswrd" -e "DELETE FROM mysql.user WHERE User='';"
-    sudo mysql -u root -p"$sqlpasswrd" -e "DROP DATABASE IF EXISTS test;DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';"
-    sudo mysql -u root -p"$sqlpasswrd" -e "FLUSH PRIVILEGES;"
-
-    echo -e "${YELLOW}...And add some settings to /etc/mysql/my.cnf:${NC}"
-    sleep 2
-
-    sudo bash -c 'cat << EOF >> /etc/mysql/my.cnf
-[mysqld]
-character-set-client-handshake = FALSE
-character-set-server = utf8mb4
-collation-server = utf8mb4_unicode_ci
-
-[mysql]
-default-character-set = utf8mb4
-EOF'
-
-    sudo mysqladmin shutdown
+    sudo mysql_secure_installation
 
     # Create the hidden marker file to indicate this section of the script has run.
     touch "$MARKER_FILE"
@@ -303,11 +318,6 @@ EOF'
     echo -e "\n"
     sleep 1
 fi
-
-# Restart MariaDB after applying settings
-echo -e "${YELLOW}Restarting MariaDB...${NC}"
-sudo mysqld_safe --datadir='/var/lib/mysql' &
-sleep 10
 
 # Install NVM, Node, npm and yarn
 echo -e ${YELLOW}"Now to install NVM, Node, npm and yarn${NC}"
@@ -551,3 +561,4 @@ case "$continue_prod" in
     echo -e "-----------------------------------------------------------------------------------------------${NC}"
     ;;
 esac
+
