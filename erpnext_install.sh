@@ -390,9 +390,23 @@ EOF
     echo -e ${YELLOW}"Now we'll go ahead to apply MariaDB security settings...${NC}"
     sleep 2
 
-    sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '$sqlpasswrd';"
+    # Apply the security settings
+    password_changed=false
+    while [ "$password_changed" = false ]; do
+        sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '$sqlpasswrd';"
+        
+        # Check if the password update was successful
+        if sudo mysql -u root -p"$sqlpasswrd" -e "SELECT 1;" &> /dev/null; then
+            password_changed=true
+            echo -e "${GREEN}Password update successful!${NC}"
+        else
+            echo -e "${RED}Password update failed! Retrying...${NC}"
+            sleep 2 # wait for 2 seconds before retrying
+        fi
+    done
+    
     sudo mysql -u root -p"$sqlpasswrd" -e "DELETE FROM mysql.user WHERE User='';"
-    sudo mysql -u root -p"$sqlpasswrd" -e "DROP DATABASE IF EXISTS test;DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';"
+    sudo mysql -u root -p"$sqlpasswrd" -e "DROP DATABASE IF EXISTS test; DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';"
     sudo mysql -u root -p"$sqlpasswrd" -e "FLUSH PRIVILEGES;"
 
     # Create the hidden marker file to indicate this section of the script has run.
