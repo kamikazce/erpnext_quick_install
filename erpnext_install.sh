@@ -405,6 +405,11 @@ EOF
         fi
     done
     
+    # Grant privileges to root user for localhost and 127.0.0.1
+    sudo mysql -u root -p"$sqlpasswrd" -e "GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' IDENTIFIED BY '$sqlpasswrd' WITH GRANT OPTION;"
+    sudo mysql -u root -p"$sqlpasswrd" -e "GRANT ALL PRIVILEGES ON *.* TO 'root'@'127.0.0.1' IDENTIFIED BY '$sqlpasswrd' WITH GRANT OPTION;"
+    sudo mysql -u root -p"$sqlpasswrd" -e "FLUSH PRIVILEGES;"
+
     sudo mysql -u root -p"$sqlpasswrd" -e "DELETE FROM mysql.user WHERE User='';"
     sudo mysql -u root -p"$sqlpasswrd" -e "DROP DATABASE IF EXISTS test; DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';"
     sudo mysql -u root -p"$sqlpasswrd" -e "FLUSH PRIVILEGES;"
