@@ -103,6 +103,7 @@ ask_twice() {
         fi
     done
 }
+
 echo -e "${LIGHT_BLUE}Welcome to the ERPNext Installer...${NC}"
 echo -e "\n"
 sleep 3
@@ -302,21 +303,66 @@ echo -e "${YELLOW}Restarting MariaDB service...${NC}"
 sudo service mariadb restart
 sleep 5
 
+# Function to set MySQL root password
+set_mysql_root_password() {
+    local password="$1"
+    sudo mysqladmin -u root password "$password"
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}Failed to set MySQL root password. Exiting.${NC}"
+        exit 1
+    fi
+}
+
 # Use a hidden marker file to determine if this section of the script has run before.
 MARKER_FILE=~/.mysql_configured.marker
 
 if [ ! -f "$MARKER_FILE" ]; then
-    # Now we'll go through the required settings of the mysql_secure_installation...
-    echo -e ${YELLOW}"Now we'll go ahead to apply MariaDB security settings...${NC}"
-    sleep 2
+    echo -e "${YELLOW}Configuring MySQL...${NC}"
+    
+    # Stop MySQL service
+    sudo service mysql stop
 
-    sudo mysql_secure_installation
+    # Start MySQL without grant tables
+    sudo mysqld_safe --skip-grant-tables &
+    sleep 5
+
+    # Set the root password
+    set_mysql_root_password "$sqlpasswrd"
+
+    # Stop MySQL
+    sudo killall mysqld
+    sleep 5
+
+    # Start MySQL normally
+    sudo service mysql start
+
+    # Secure the MySQL installation
+    sudo mysql_secure_installation <<EOF
+
+y
+$sqlpasswrd
+$sqlpasswrd
+y
+y
+y
+y
+EOF
 
     # Create the hidden marker file to indicate this section of the script has run.
     touch "$MARKER_FILE"
-    echo -e "${GREEN}MariaDB settings done!${NC}"
+    echo -e "${GREEN}MySQL configuration completed successfully!${NC}"
     echo -e "\n"
     sleep 1
+else
+    echo -e "${YELLOW}MySQL has already been configured. Skipping configuration step.${NC}"
+fi
+
+# Test MySQL connection
+if mysql -u root -p"$sqlpasswrd" -e "SELECT 1" >/dev/null 2>&1; then
+    echo -e "${GREEN}MySQL connection successful!${NC}"
+else
+    echo -e "${RED}Failed to connect to MySQL. Please check your password and try again.${NC}"
+    exit 1
 fi
 
 # Install NVM, Node, npm and yarn
