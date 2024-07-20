@@ -320,8 +320,10 @@ MARKER_FILE=~/.mysql_configured.marker
 if [ ! -f "$MARKER_FILE" ]; then
     echo -e "${YELLOW}Configuring MySQL...${NC}"
     
-    # Stop MySQL service
-    sudo service mysql stop
+    # Stop MySQL service if it's running
+    if sudo systemctl is-active --quiet mysql; then
+        sudo systemctl stop mysql
+    fi
 
     # Start MySQL without grant tables
     sudo mysqld_safe --skip-grant-tables &
@@ -335,11 +337,11 @@ FLUSH PRIVILEGES;
 EOF
 
     # Stop MySQL
-    sudo killall mysqld
+    sudo killall mysqld || true
     sleep 5
 
     # Start MySQL normally
-    sudo service mysql start
+    sudo systemctl start mysql
 
     # Secure the MySQL installation
     sudo mysql_secure_installation <<EOF
