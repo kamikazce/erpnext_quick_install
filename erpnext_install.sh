@@ -328,7 +328,11 @@ if [ ! -f "$MARKER_FILE" ]; then
     sleep 5
 
     # Set the root password
-    set_mysql_root_password "$sqlpasswrd"
+    mysql -u root <<EOF
+FLUSH PRIVILEGES;
+ALTER USER 'root'@'localhost' IDENTIFIED BY '$sqlpasswrd';
+FLUSH PRIVILEGES;
+EOF
 
     # Stop MySQL
     sudo killall mysqld
