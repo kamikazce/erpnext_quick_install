@@ -103,7 +103,6 @@ ask_twice() {
         fi
     done
 }
-
 echo -e "${LIGHT_BLUE}Welcome to the ERPNext Installer...${NC}"
 echo -e "\n"
 sleep 3
@@ -262,20 +261,107 @@ sudo apt install mariadb-server mariadb-client -y
 echo -e "${GREEN}MariaDB and other packages have been installed successfully.${NC}"
 sleep 2
 
-# Update /etc/mysql/mariadb.conf.d/50-server.cnf
-echo -e "${YELLOW}Updating MariaDB configuration...${NC}"
-sudo bash -c 'cat > /etc/mysql/mariadb.conf.d/50-server.cnf' << EOF
+
+# Use a hidden marker file to determine if this section of the script has run before.
+MARKER_FILE=~/.mysql_configured.marker
+
+if [ ! -f "$MARKER_FILE" ]; then
+    # Now we'll update the MariaDB configuration
+    echo -e "${YELLOW}Updating MariaDB configuration...${NC}"
+    sleep 2
+
+    # Backup the original configuration file
+    sudo cp /etc/mysql/mariadb.conf.d/50-server.cnf /etc/mysql/mariadb.conf.d/50-server.cnf.bak
+
+    # Delete all content and insert new content
+    sudo tee /etc/mysql/mariadb.conf.d/50-server.cnf > /dev/null <<EOF
+# These groups are read by MariaDB server.
+# Use it for options that only the server (but not clients) should see
+# this is read by the standalone daemon and embedded servers
+[server]
+
+# this is only for the mysqld standalone daemon
+[mysqld]
+
+#
+# * Basic Settings
+#
+user                    = mysql
+pid-file                = /run/mysqld/mysqld.pid
+basedir                 = /usr
+datadir                 = /var/lib/mysql
+tmpdir                  = /tmp
+# Broken reverse DNS slows down connections considerably and name resolve is
+# safe to skip if there are no "host by domain name" access grants
+skip-name-resolve
+# Instead of skip-networking the default is now to listen only on
+# localhost which is more compatible and is not less secure.
+bind-address            = 127.0.0.1
+
+#
+# * Fine Tuning
+#
+key_buffer_size        = 128M
+max_allowed_packet     = 1G
+thread_stack           = 192K
+thread_cache_size      = 8
+# This replaces the startup script and checks MyISAM tables if needed
+# the first time they are touched
+myisam_recover_options = BACKUP
+max_connections        = 100
+table_cache            = 64
+
+#
+# * Logging and Replication
+#
+# Both location gets rotated by the cronjob.
+# Be aware that this log type is a performance killer.
+# Recommend only changing this at runtime for short testing periods if needed!
+#general_log_file       = /var/log/mysql/mysql.log
+#general_log            = 1
+
+# When running under systemd, error logging goes via stdout/stderr to journald
+# and when running legacy init error logging goes to syslog due to
+# /etc/mysql/conf.d/mariadb.conf.d/50-mysqld_safe.cnf
+# Enable this if you want to have error logging into a separate file
+#log_error = /var/log/mysql/error.log
+
+# Enable the slow query log to see queries with especially long duration
+#slow_query_log_file    = /var/log/mysql/mariadb-slow.log
+#long_query_time        = 10
+#log_slow_verbosity     = query_plan,explain
+#log-queries-not-using-indexes
+#min_examined_row_limit = 1000
+
+# The following can be used as easy to replay backup logs or for replication.
+# note: if you are setting up a replication slave, see README.Debian about
+#       other settings you may need to change.
+#server-id              = 1
+#log_bin                = /var/log/mysql/mysql-bin.log
+expire_logs_days        = 10
+#max_binlog_size        = 100M
+
+#
+# * SSL/TLS
+#
+# For documentation, please read
+# https://mariadb.com/kb/en/securing-connections-for-client-and-server/
+#ssl-ca = /etc/mysql/cacert.pem
+#ssl-cert = /etc/mysql/server-cert.pem
+#ssl-key = /etc/mysql/server-key.pem
+#require-secure-transport = on
+
+#
+# * Character sets
 #
 # MySQL/MariaDB default is Latin1, but in Debian we rather default to the full
 # utf8 4-byte character set. See also client.cnf
-[mysqld]
 character-set-server  = utf8mb4
-collation-server      = utf8mb4_unicode_ci
+collation-server      = utf8mb4_general_ci
 
 #
 # * InnoDB
 #
-
 # InnoDB is enabled by default with a 10MB datafile in /var/lib/mysql/.
 # Read the manual for more InnoDB related options. There are many!
 # Most important is to give InnoDB 80 % of the system RAM for buffer use:
@@ -296,80 +382,24 @@ collation-server      = utf8mb4_unicode_ci
 [mariadb-10.6]
 EOF
 
-echo -e "${GREEN}MariaDB configuration updated.${NC}"
-sleep 2
+    # Restart MariaDB to apply new configuration
+    echo -e "${YELLOW}Restarting MariaDB to apply new configuration...${NC}"
+    sudo systemctl restart mariadb
 
-# Restart MariaDB service
-echo -e "${YELLOW}Restarting MariaDB service...${NC}"
-sudo service mariadb restart
-sleep 5
+    # Now we'll go through the required settings of the mysql_secure_installation...
+    echo -e ${YELLOW}"Now we'll go ahead to apply MariaDB security settings...${NC}"
+    sleep 2
 
-# Function to set MySQL root password
-set_mysql_root_password() {
-    local password="$1"
-    sudo mysqladmin -u root password "$password"
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}Failed to set MySQL root password. Exiting.${NC}"
-        exit 1
-    fi
-}
-
-# Use a hidden marker file to determine if this section of the script has run before.
-MARKER_FILE=~/.mysql_configured.marker
-
-if [ ! -f "$MARKER_FILE" ]; then
-    echo -e "${YELLOW}Configuring MySQL...${NC}"
-    
-    # Stop MySQL service if it's running
-    if sudo systemctl is-active --quiet mysql; then
-        sudo systemctl stop mysql
-    fi
-
-    # Start MySQL without grant tables
-    sudo mysqld_safe --skip-grant-tables &
-    sleep 5
-
-    # Set the root password
-    mysql -u root <<EOF
-FLUSH PRIVILEGES;
-ALTER USER 'root'@'localhost' IDENTIFIED BY '$sqlpasswrd';
-FLUSH PRIVILEGES;
-EOF
-
-    # Stop MySQL
-    sudo killall mysqld || true
-    sleep 5
-
-    # Start MySQL normally
-    sudo systemctl start mysql
-
-    # Secure the MySQL installation
-    sudo mysql_secure_installation <<EOF
-
-y
-$sqlpasswrd
-$sqlpasswrd
-y
-y
-y
-y
-EOF
+    sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '$sqlpasswrd';"
+    sudo mysql -u root -p"$sqlpasswrd" -e "DELETE FROM mysql.user WHERE User='';"
+    sudo mysql -u root -p"$sqlpasswrd" -e "DROP DATABASE IF EXISTS test;DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';"
+    sudo mysql -u root -p"$sqlpasswrd" -e "FLUSH PRIVILEGES;"
 
     # Create the hidden marker file to indicate this section of the script has run.
     touch "$MARKER_FILE"
-    echo -e "${GREEN}MySQL configuration completed successfully!${NC}"
+    echo -e "${GREEN}MariaDB configuration and security settings completed!${NC}"
     echo -e "\n"
     sleep 1
-else
-    echo -e "${YELLOW}MySQL has already been configured. Skipping configuration step.${NC}"
-fi
-
-# Test MySQL connection
-if mysql -u root -p"$sqlpasswrd" -e "SELECT 1" >/dev/null 2>&1; then
-    echo -e "${GREEN}MySQL connection successful!${NC}"
-else
-    echo -e "${RED}Failed to connect to MySQL. Please check your password and try again.${NC}"
-    exit 1
 fi
 
 # Install NVM, Node, npm and yarn
@@ -510,7 +540,7 @@ case "$continue_prod" in
         bench setup redis
         sudo supervisorctl reload
     fi
-    echo -e "${YELLOW}Restarting bench to apply all changes and optimizing environment permissions.${NC}"
+    echo -e "${YELLOW}Restarting bench to apply all changes and optimizing environment pernissions.${NC}"
     sleep 1
 
 
