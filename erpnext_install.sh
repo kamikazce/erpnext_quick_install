@@ -268,6 +268,7 @@ sudo bash -c 'cat > /etc/mysql/mariadb.conf.d/50-server.cnf' << EOF
 #
 # MySQL/MariaDB default is Latin1, but in Debian we rather default to the full
 # utf8 4-byte character set. See also client.cnf
+[mysqld]
 character-set-server  = utf8mb4
 collation-server      = utf8mb4_unicode_ci
 
